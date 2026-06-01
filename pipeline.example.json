@@ -1,0 +1,109 @@
+{
+  "run": {
+    "name": "stack-cube",
+    "work_dir": "runs/{run_name}"
+  },
+  "instructions": {
+    "default": "stack the cube onto the target"
+  },
+  "mimic": {
+    "enabled": true,
+    "command": "python3 run_mimic_multi_gpu.py",
+    "args": {
+      "isaaclab-sh": "../IsaacLab/isaaclab.sh",
+      "generate-script": "./generate_data.py",
+      "parallelism": 8,
+      "gpu-ids": "0,1,2,3,4,5,6,7",
+      "task": "Isaac-Stack-Cube-Franka-IK-Rel-Blueprint-Mimic-v0",
+      "num_envs": 1,
+      "generation_num_trials": 32,
+      "episode_length_s": 5,
+      "isolate_device": true,
+      "headless": true,
+      "enable_cameras": true,
+      "image_root": "{work_dir}/mimic_frames",
+      "image_data_type": "rgb",
+      "input_file": "annotated_dataset.hdf5",
+      "output_file": "{mimic_output}",
+      "seed": 42,
+      "debug": false,
+      "pause_subtask": false,
+      "overwrite": true
+    },
+    "batch_output": "{work_dir}/mimic/generated_dataset.hdf5",
+    "batch_output_key": "mimic_output"
+  },
+  "split": {
+    "enabled": true,
+    "command": "python3 split_hdf5.py",
+    "args": {
+      "input": "{mimic_output}",
+      "output-dir": "{work_dir}/episodes"
+    },
+    "output_glob": "{work_dir}/episodes/*.hdf5"
+  },
+  "sources": {
+    "glob": "{work_dir}/episodes/*.hdf5"
+  },
+  "render": {
+    "enabled": true,
+    "command": "python3 render_mimic_frames.py",
+    "args": {
+      "input": "{source_hdf5}",
+      "output": "{base_video}",
+      "frames-root": "{work_dir}/mimic_frames",
+      "camera-name": "table_cam",
+      "data-type": "rgb",
+      "fps": 30,
+      "overwrite": true
+    },
+    "output_pattern": "{work_dir}/rendered/{episode_id}.mp4"
+  },
+  "cosmos": {
+    "enabled": true,
+    "variants": 4,
+    "background_variants": 2,
+    "lighting_variants": 2,
+    "parallelism": 8,
+    "command": "python3 cosmos_transfer.py",
+    "args": {
+      "input": "{base_video}",
+      "output": "{variant_video}",
+      "prompt": "{instruction}. Keep the robot motion, object motion, and contact sequence unchanged. Only vary the visual appearance.",
+      "seed": "{variant_index}",
+      "server-url": "http://127.0.0.1:5000",
+      "endpoint": "/canny/submit",
+      "control-weight": 0.5,
+      "sigma-max": 70,
+      "canny-strength": "medium",
+      "timeout": 7200
+    },
+    "output_pattern": "{work_dir}/cosmos/{episode_id}/variant_{variant_index}.mp4"
+  },
+  "lerobot": {
+    "enabled": true,
+    "root": "{work_dir}/lerobot",
+    "manifest_path": "{work_dir}/manifests/lerobot_pairs.jsonl",
+    "command": "python3 hdf5_video_to_lerobot.py",
+    "args": {
+      "source-hdf5": "{source_hdf5}",
+      "video": "{video_path}",
+      "episode-id": "{final_episode_id}",
+      "instruction": "{instruction}",
+      "output-root": "{lerobot_root}",
+      "fps": 30,
+      "robot-type": "custom",
+      "camera-key": "observation.images.ego_view",
+      "action-key": "actions",
+      "state-key": [
+        "obs/joint_pos",
+        "obs/joint_vel",
+        "obs/eef_pos",
+        "obs/eef_quat",
+        "obs/gripper_pos",
+        "obs/object"
+      ],
+      "overwrite": true
+    }
+  }
+}

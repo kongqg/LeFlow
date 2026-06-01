@@ -1,0 +1,8 @@
+.idea/
+.venv/
+__pycache__/
+*.pyc
+runs/
+pipeline.json
+pipeline.local.json
+
